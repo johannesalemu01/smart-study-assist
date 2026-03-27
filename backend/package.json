@@ -1,0 +1,11 @@
+{
+  "name": "backend",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "go run ./cmd/server",
+    "build": "go build ./cmd/server",
+    "lint": "echo \"No Go lint configured yet\""
+  }
+}
+

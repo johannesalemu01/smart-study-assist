@@ -5,12 +5,12 @@
   "private": true,
   "workspaces": [
     "apps/web",
-    "apps/api"
+    "backend"
   ],
   "scripts": {
-    "dev": "concurrently -n web,api -c cyan,magenta \"npm run dev -w apps/web\" \"npm run dev -w apps/api\"",
-    "build": "npm run build -w apps/web && npm run build -w apps/api",
-    "lint": "npm run lint -w apps/web && npm run lint -w apps/api",
+    "dev": "concurrently -n web,api -c cyan,magenta \"npm run dev -w apps/web\" \"npm run dev -w backend\"",
+    "build": "npm run build -w apps/web && npm run build -w backend",
+    "lint": "npm run lint -w apps/web && npm run lint -w backend",
     "test": "echo \"No test configured yet\""
   },
   "keywords": [],
