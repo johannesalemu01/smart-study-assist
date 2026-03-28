@@ -775,7 +775,10 @@ export default function Home() {
             <p className="muted small">
               Pull a due card instantly and review from Command Center.
             </p>
-            <button className="button button-ghost" onClick={pickQuickReviewCard}>
+            <button
+              className="button button-ghost"
+              onClick={pickQuickReviewCard}
+            >
               Pick Random Card
             </button>
             {!!quickReviewCard && (
