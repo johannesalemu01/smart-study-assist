@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 type View =
-  | "dashboard"
-  | "notes"
-  | "acronyms"
-  | "flashcards"
-  | "quizzes"
-  | "study";
+  | 'dashboard'
+  | 'notes'
+  | 'acronyms'
+  | 'flashcards'
+  | 'quizzes'
+  | 'study';
 
 type Note = {
   id: string;
@@ -65,13 +65,17 @@ type Dashboard = {
   weakAreas: string[];
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/graphql";
-const DEFAULT_USER_ID = "64b64f7c5e9b1f0d0a1b2c3d";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/graphql';
+const DEFAULT_USER_ID = '64b64f7c5e9b1f0d0a1b2c3d';
 
-async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+async function gql<T>(
+  query: string,
+  variables?: Record<string, unknown>,
+): Promise<T> {
   const res = await fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
   });
 
@@ -81,16 +85,16 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
 
   const payload = await res.json();
   if (payload.errors?.length) {
-    throw new Error(payload.errors[0]?.message ?? "GraphQL error");
+    throw new Error(payload.errors[0]?.message ?? 'GraphQL error');
   }
 
   return payload.data as T;
 }
 
 export default function Home() {
-  const [activeView, setActiveView] = useState<View>("dashboard");
+  const [activeView, setActiveView] = useState<View>('dashboard');
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState("Ready");
+  const [status, setStatus] = useState('Ready');
 
   const [userId, setUserId] = useState(DEFAULT_USER_ID);
 
@@ -99,25 +103,25 @@ export default function Home() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
 
-  const [noteTitle, setNoteTitle] = useState("");
-  const [noteTags, setNoteTags] = useState("");
-  const [noteContent, setNoteContent] = useState("");
+  const [noteTitle, setNoteTitle] = useState('');
+  const [noteTags, setNoteTags] = useState('');
+  const [noteContent, setNoteContent] = useState('');
 
-  const [acronymWords, setAcronymWords] = useState("");
+  const [acronymWords, setAcronymWords] = useState('');
   const [acronyms, setAcronyms] = useState<AcronymSuggestion[]>([]);
 
-  const [manualCardFront, setManualCardFront] = useState("");
-  const [manualCardBack, setManualCardBack] = useState("");
-  const [selectedNoteId, setSelectedNoteId] = useState("");
+  const [manualCardFront, setManualCardFront] = useState('');
+  const [manualCardBack, setManualCardBack] = useState('');
+  const [selectedNoteId, setSelectedNoteId] = useState('');
 
-  const [activeQuizId, setActiveQuizId] = useState("");
+  const [activeQuizId, setActiveQuizId] = useState('');
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const [lastQuizScore, setLastQuizScore] = useState<number | null>(null);
 
   const [pomodoroOn, setPomodoroOn] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
-  const [mode, setMode] = useState<"focus" | "break">("focus");
-  const [studyTopic, setStudyTopic] = useState("General Study");
+  const [mode, setMode] = useState<'focus' | 'break'>('focus');
+  const [studyTopic, setStudyTopic] = useState('General Study');
 
   const activeQuiz = useMemo(
     () => quizzes.find((quiz) => quiz.id === activeQuizId),
@@ -125,43 +129,44 @@ export default function Home() {
   );
 
   const navItems: { id: View; label: string }[] = [
-    { id: "dashboard", label: "Progress" },
-    { id: "notes", label: "Notes" },
-    { id: "acronyms", label: "Acronyms" },
-    { id: "flashcards", label: "Flashcards" },
-    { id: "quizzes", label: "Quizzes" },
-    { id: "study", label: "Study Mode" },
+    { id: 'dashboard', label: 'Progress' },
+    { id: 'notes', label: 'Notes' },
+    { id: 'acronyms', label: 'Acronyms' },
+    { id: 'flashcards', label: 'Flashcards' },
+    { id: 'quizzes', label: 'Quizzes' },
+    { id: 'study', label: 'Study Mode' },
   ];
 
   async function loadAll() {
     setLoading(true);
     try {
-      const [noteData, flashcardData, quizData, dashboardData] = await Promise.all([
-        gql<{ notes: Note[] }>(
-          `query($userId: String!) { notes(userId: $userId) { id title content summary keyTerms bulletPoints examReadyText tags } }`,
-          { userId },
-        ),
-        gql<{ flashcards: Flashcard[] }>(
-          `query($userId: String!) { flashcards(userId: $userId, dueOnly: false) { id noteId front back nextReview interval easeFactor repetition } }`,
-          { userId },
-        ),
-        gql<{ quizzes: Quiz[] }>(
-          `query($userId: String!) { quizzes(userId: $userId) { id title createdAt questions { id text type options correctAnswer topic } } }`,
-          { userId },
-        ),
-        gql<{ dashboard: Dashboard }>(
-          `query($userId: String!) { dashboard(userId: $userId) { totalStudySeconds quizAttempts averageQuizScore topicsCovered weakAreas } }`,
-          { userId },
-        ),
-      ]);
+      const [noteData, flashcardData, quizData, dashboardData] =
+        await Promise.all([
+          gql<{ notes: Note[] }>(
+            `query($userId: String!) { notes(userId: $userId) { id title content summary keyTerms bulletPoints examReadyText tags } }`,
+            { userId },
+          ),
+          gql<{ flashcards: Flashcard[] }>(
+            `query($userId: String!) { flashcards(userId: $userId, dueOnly: false) { id noteId front back nextReview interval easeFactor repetition } }`,
+            { userId },
+          ),
+          gql<{ quizzes: Quiz[] }>(
+            `query($userId: String!) { quizzes(userId: $userId) { id title createdAt questions { id text type options correctAnswer topic } } }`,
+            { userId },
+          ),
+          gql<{ dashboard: Dashboard }>(
+            `query($userId: String!) { dashboard(userId: $userId) { totalStudySeconds quizAttempts averageQuizScore topicsCovered weakAreas } }`,
+            { userId },
+          ),
+        ]);
 
       setNotes(noteData.notes ?? []);
       setFlashcards(flashcardData.flashcards ?? []);
       setQuizzes(quizData.quizzes ?? []);
       setDashboard(dashboardData.dashboard ?? null);
-      setStatus("Synced with API");
+      setStatus('Synced with API');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Failed to load data");
+      setStatus(error instanceof Error ? error.message : 'Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -190,8 +195,8 @@ export default function Home() {
     }
 
     setMode((prev) => {
-      const next = prev === "focus" ? "break" : "focus";
-      setSecondsLeft(next === "focus" ? 25 * 60 : 5 * 60);
+      const next = prev === 'focus' ? 'break' : 'focus';
+      setSecondsLeft(next === 'focus' ? 25 * 60 : 5 * 60);
       return next;
     });
   }, [pomodoroOn, secondsLeft]);
@@ -199,14 +204,14 @@ export default function Home() {
   async function onCreateNote(e: FormEvent) {
     e.preventDefault();
     if (!noteTitle.trim() || !noteContent.trim()) {
-      setStatus("Title and content are required.");
+      setStatus('Title and content are required.');
       return;
     }
 
     setLoading(true);
     try {
       const tags = noteTags
-        .split(",")
+        .split(',')
         .map((x) => x.trim())
         .filter(Boolean);
 
@@ -217,13 +222,15 @@ export default function Home() {
         { userId, title: noteTitle, content: noteContent, tags },
       );
 
-      setNoteTitle("");
-      setNoteContent("");
-      setNoteTags("");
-      setStatus("Note created with smart summary + key terms.");
+      setNoteTitle('');
+      setNoteContent('');
+      setNoteTags('');
+      setStatus('Note created with smart summary + key terms.');
       await loadAll();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not create note");
+      setStatus(
+        error instanceof Error ? error.message : 'Could not create note',
+      );
     } finally {
       setLoading(false);
     }
@@ -237,7 +244,7 @@ export default function Home() {
       .filter(Boolean);
 
     if (!words.length) {
-      setStatus("Please enter at least one word or bullet point.");
+      setStatus('Please enter at least one word or bullet point.');
       return;
     }
 
@@ -250,9 +257,11 @@ export default function Home() {
         { words },
       );
       setAcronyms(data.generateAcronyms ?? []);
-      setStatus("Acronym set generated and ranked.");
+      setStatus('Acronym set generated and ranked.');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Acronym generation failed");
+      setStatus(
+        error instanceof Error ? error.message : 'Acronym generation failed',
+      );
     } finally {
       setLoading(false);
     }
@@ -261,7 +270,7 @@ export default function Home() {
   async function onCreateManualCard(e: FormEvent) {
     e.preventDefault();
     if (!manualCardFront.trim() || !manualCardBack.trim()) {
-      setStatus("Both front and back are required.");
+      setStatus('Both front and back are required.');
       return;
     }
 
@@ -278,12 +287,14 @@ export default function Home() {
           back: manualCardBack,
         },
       );
-      setManualCardFront("");
-      setManualCardBack("");
-      setStatus("Flashcard created.");
+      setManualCardFront('');
+      setManualCardBack('');
+      setStatus('Flashcard created.');
       await loadAll();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Failed to create flashcard");
+      setStatus(
+        error instanceof Error ? error.message : 'Failed to create flashcard',
+      );
     } finally {
       setLoading(false);
     }
@@ -298,10 +309,14 @@ export default function Home() {
         }`,
         { userId, noteId, count: 6 },
       );
-      setStatus("Auto-generated flashcards from note.");
+      setStatus('Auto-generated flashcards from note.');
       await loadAll();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Failed to auto-generate cards");
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : 'Failed to auto-generate cards',
+      );
     } finally {
       setLoading(false);
     }
@@ -319,7 +334,9 @@ export default function Home() {
       setStatus(`Review saved (quality ${quality}).`);
       await loadAll();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not save review");
+      setStatus(
+        error instanceof Error ? error.message : 'Could not save review',
+      );
     } finally {
       setLoading(false);
     }
@@ -334,10 +351,12 @@ export default function Home() {
         }`,
         { userId, noteId, count: 6 },
       );
-      setStatus("Quiz generated from note.");
+      setStatus('Quiz generated from note.');
       await loadAll();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not generate quiz");
+      setStatus(
+        error instanceof Error ? error.message : 'Could not generate quiz',
+      );
     } finally {
       setLoading(false);
     }
@@ -362,17 +381,19 @@ export default function Home() {
       );
 
       setLastQuizScore(data.submitQuizAttempt.score);
-      setStatus("Quiz submitted. Weak areas are tracked in dashboard.");
+      setStatus('Quiz submitted. Weak areas are tracked in dashboard.');
       await loadAll();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not submit quiz");
+      setStatus(
+        error instanceof Error ? error.message : 'Could not submit quiz',
+      );
     } finally {
       setLoading(false);
     }
   }
 
   async function savePomodoroSession() {
-    const minutes = mode === "focus" ? 25 : 5;
+    const minutes = mode === 'focus' ? 25 : 5;
     setLoading(true);
     try {
       await gql(
@@ -382,14 +403,16 @@ export default function Home() {
         {
           userId,
           duration: minutes * 60,
-          type: mode === "focus" ? "pomodoro" : "break",
+          type: mode === 'focus' ? 'pomodoro' : 'break',
           topic: studyTopic,
         },
       );
-      setStatus("Study session saved.");
+      setStatus('Study session saved.');
       await loadAll();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Could not save study session");
+      setStatus(
+        error instanceof Error ? error.message : 'Could not save study session',
+      );
     } finally {
       setLoading(false);
     }
@@ -408,11 +431,15 @@ export default function Home() {
           </div>
           <div className="panel p-3">
             <p className="muted text-xs uppercase">Quiz Attempts</p>
-            <p className="text-2xl font-semibold">{dashboard?.quizAttempts ?? 0}</p>
+            <p className="text-2xl font-semibold">
+              {dashboard?.quizAttempts ?? 0}
+            </p>
           </div>
           <div className="panel p-3">
             <p className="muted text-xs uppercase">Average Quiz Score</p>
-            <p className="text-2xl font-semibold">{dashboard?.averageQuizScore ?? 0}%</p>
+            <p className="text-2xl font-semibold">
+              {dashboard?.averageQuizScore ?? 0}%
+            </p>
           </div>
         </div>
 
@@ -425,7 +452,9 @@ export default function Home() {
                   {topic}
                 </span>
               ))}
-              {!dashboard?.topicsCovered?.length && <p className="muted text-sm">No topics yet.</p>}
+              {!dashboard?.topicsCovered?.length && (
+                <p className="muted text-sm">No topics yet.</p>
+              )}
             </div>
           </div>
           <div className="panel p-3">
@@ -434,10 +463,14 @@ export default function Home() {
               {(dashboard?.weakAreas ?? []).map((topic) => (
                 <div key={topic} className="flex items-center justify-between">
                   <span>{topic}</span>
-                  <span className="text-xs px-2 py-1 rounded bg-red-100 text-red-700">Review</span>
+                  <span className="text-xs px-2 py-1 rounded bg-red-100 text-red-700">
+                    Review
+                  </span>
                 </div>
               ))}
-              {!dashboard?.weakAreas?.length && <p className="muted text-sm">No weak areas recorded.</p>}
+              {!dashboard?.weakAreas?.length && (
+                <p className="muted text-sm">No weak areas recorded.</p>
+              )}
             </div>
           </div>
         </div>
@@ -494,7 +527,10 @@ export default function Home() {
                   >
                     Flashcards
                   </button>
-                  <button className="button button-secondary" onClick={() => createQuizFromNote(note.id)}>
+                  <button
+                    className="button button-secondary"
+                    onClick={() => createQuizFromNote(note.id)}
+                  >
                     Quiz
                   </button>
                 </div>
@@ -502,7 +538,8 @@ export default function Home() {
               <p className="muted">{note.summary}</p>
               {!!note.keyTerms?.length && (
                 <p>
-                  <span className="font-semibold">Key terms:</span> {note.keyTerms.join(", ")}
+                  <span className="font-semibold">Key terms:</span>{' '}
+                  {note.keyTerms.join(', ')}
                 </p>
               )}
               {!!note.bulletPoints?.length && (
@@ -514,7 +551,11 @@ export default function Home() {
               )}
             </article>
           ))}
-          {!notes.length && <p className="muted">Create your first note to unlock auto-generated study assets.</p>}
+          {!notes.length && (
+            <p className="muted">
+              Create your first note to unlock auto-generated study assets.
+            </p>
+          )}
         </div>
       </section>
     );
@@ -540,16 +581,21 @@ export default function Home() {
           {acronyms.map((item) => (
             <article key={item.acronym} className="panel p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold tracking-wide">{item.acronym}</h3>
+                <h3 className="text-xl font-bold tracking-wide">
+                  {item.acronym}
+                </h3>
                 <span className="chip">Score: {item.score}</span>
               </div>
               <p className="muted text-sm">
-                Readability {item.readabilityScore} · Familiarity {item.familiarityScore}
+                Readability {item.readabilityScore} · Familiarity{' '}
+                {item.familiarityScore}
               </p>
               <p>{item.mnemonic}</p>
             </article>
           ))}
-          {!acronyms.length && <p className="muted">Generated acronyms will appear here.</p>}
+          {!acronyms.length && (
+            <p className="muted">Generated acronyms will appear here.</p>
+          )}
         </div>
       </section>
     );
@@ -592,17 +638,28 @@ export default function Home() {
         <div className="grid md:grid-cols-2 gap-3">
           {flashcards.map((card) => (
             <article key={card.id} className="panel p-4 space-y-2">
-              <p className="text-sm muted">Next review: {new Date(card.nextReview).toLocaleString()}</p>
+              <p className="text-sm muted">
+                Next review: {new Date(card.nextReview).toLocaleString()}
+              </p>
               <p className="font-semibold">{card.front}</p>
               <p>{card.back}</p>
               <div className="flex gap-2">
-                <button className="button button-secondary" onClick={() => reviewCard(card.id, 2)}>
+                <button
+                  className="button button-secondary"
+                  onClick={() => reviewCard(card.id, 2)}
+                >
                   Hard
                 </button>
-                <button className="button button-secondary" onClick={() => reviewCard(card.id, 4)}>
+                <button
+                  className="button button-secondary"
+                  onClick={() => reviewCard(card.id, 4)}
+                >
                   Good
                 </button>
-                <button className="button button-secondary" onClick={() => reviewCard(card.id, 5)}>
+                <button
+                  className="button button-secondary"
+                  onClick={() => reviewCard(card.id, 5)}
+                >
                   Easy
                 </button>
               </div>
@@ -620,7 +677,8 @@ export default function Home() {
         <div className="panel p-5 space-y-3">
           <h2 className="text-2xl font-bold">Quiz Generator</h2>
           <p className="muted text-sm">
-            Generate a quiz from any note in the Notes section, then select it below to answer.
+            Generate a quiz from any note in the Notes section, then select it
+            below to answer.
           </p>
           <select
             className="select"
@@ -649,9 +707,12 @@ export default function Home() {
                   {!!question.options?.length ? (
                     <select
                       className="select"
-                      value={quizAnswers[question.id] ?? ""}
+                      value={quizAnswers[question.id] ?? ''}
                       onChange={(e) =>
-                        setQuizAnswers((curr) => ({ ...curr, [question.id]: e.target.value }))
+                        setQuizAnswers((curr) => ({
+                          ...curr,
+                          [question.id]: e.target.value,
+                        }))
                       }
                     >
                       <option value="">Choose an answer</option>
@@ -664,9 +725,12 @@ export default function Home() {
                   ) : (
                     <input
                       className="input"
-                      value={quizAnswers[question.id] ?? ""}
+                      value={quizAnswers[question.id] ?? ''}
                       onChange={(e) =>
-                        setQuizAnswers((curr) => ({ ...curr, [question.id]: e.target.value }))
+                        setQuizAnswers((curr) => ({
+                          ...curr,
+                          [question.id]: e.target.value,
+                        }))
                       }
                       placeholder="Type your answer"
                     />
@@ -677,7 +741,9 @@ export default function Home() {
                 Submit Quiz
               </button>
               {lastQuizScore !== null && (
-                <p className="text-lg font-semibold">Latest Score: {lastQuizScore}%</p>
+                <p className="text-lg font-semibold">
+                  Latest Score: {lastQuizScore}%
+                </p>
               )}
             </div>
           )}
@@ -693,12 +759,17 @@ export default function Home() {
     return (
       <section className="panel p-5 space-y-4">
         <h2 className="text-2xl font-bold">Study Mode</h2>
-        <p className="muted">Pomodoro timer: 25 minutes focus, 5 minutes break.</p>
+        <p className="muted">
+          Pomodoro timer: 25 minutes focus, 5 minutes break.
+        </p>
 
         <div className="panel p-4 text-center space-y-2">
-          <p className="text-xs uppercase muted">{mode === "focus" ? "Focus Session" : "Break Session"}</p>
+          <p className="text-xs uppercase muted">
+            {mode === 'focus' ? 'Focus Session' : 'Break Session'}
+          </p>
           <p className="text-6xl font-bold tabular-nums">
-            {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+            {String(minutes).padStart(2, '0')}:
+            {String(seconds).padStart(2, '0')}
           </p>
         </div>
 
@@ -710,10 +781,16 @@ export default function Home() {
         />
 
         <div className="grid md:grid-cols-3 gap-3">
-          <button className="button button-primary" onClick={() => setPomodoroOn(true)}>
+          <button
+            className="button button-primary"
+            onClick={() => setPomodoroOn(true)}
+          >
             Start
           </button>
-          <button className="button button-secondary" onClick={() => setPomodoroOn(false)}>
+          <button
+            className="button button-secondary"
+            onClick={() => setPomodoroOn(false)}
+          >
             Pause
           </button>
           <button
@@ -721,7 +798,7 @@ export default function Home() {
             onClick={() => {
               setPomodoroOn(false);
               setSecondsLeft(25 * 60);
-              setMode("focus");
+              setMode('focus');
             }}
           >
             Reset
@@ -739,21 +816,29 @@ export default function Home() {
     <div className="study-shell">
       <aside className="study-sidebar">
         <div className="space-y-3">
-          <p className="text-xs uppercase muted tracking-[0.2em]">Smart Study Assistant</p>
+          <p className="text-xs uppercase muted tracking-[0.2em]">
+            Smart Study Assistant
+          </p>
           <h1 className="text-2xl font-bold">Focus Console</h1>
-          <p className="text-sm muted">Minimal and distraction-light workspace for active recall.</p>
+          <p className="text-sm muted">
+            Minimal and distraction-light workspace for active recall.
+          </p>
         </div>
 
         <div className="mt-4 space-y-2">
           <label className="text-xs uppercase muted">User Id</label>
-          <input className="input" value={userId} onChange={(e) => setUserId(e.target.value)} />
+          <input
+            className="input"
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
+          />
         </div>
 
         <nav className="mt-6 space-y-2">
           {navItems.map((item) => (
             <button
               key={item.id}
-              className={`button text-left ${activeView === item.id ? "button-primary" : "button-secondary"}`}
+              className={`button text-left ${activeView === item.id ? 'button-primary' : 'button-secondary'}`}
               onClick={() => setActiveView(item.id)}
             >
               {item.label}
@@ -762,17 +847,17 @@ export default function Home() {
         </nav>
 
         <div className="mt-6 text-sm muted">
-          <p>Status: {loading ? "Working..." : status}</p>
+          <p>Status: {loading ? 'Working...' : status}</p>
         </div>
       </aside>
 
       <main className="study-main">
-        {activeView === "dashboard" && renderDashboard()}
-        {activeView === "notes" && renderNotes()}
-        {activeView === "acronyms" && renderAcronyms()}
-        {activeView === "flashcards" && renderFlashcards()}
-        {activeView === "quizzes" && renderQuizzes()}
-        {activeView === "study" && renderStudyMode()}
+        {activeView === 'dashboard' && renderDashboard()}
+        {activeView === 'notes' && renderNotes()}
+        {activeView === 'acronyms' && renderAcronyms()}
+        {activeView === 'flashcards' && renderFlashcards()}
+        {activeView === 'quizzes' && renderQuizzes()}
+        {activeView === 'study' && renderStudyMode()}
       </main>
     </div>
   );

@@ -1,22 +1,22 @@
-import type { Metadata } from "next";
-import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from 'next';
+import { IBM_Plex_Mono, Space_Grotesk } from 'next/font/google';
+import './globals.css';
 
 const bodyFont = Space_Grotesk({
-  variable: "--font-space-grotesk",
-  subsets: ["latin"],
+  variable: '--font-space-grotesk',
+  subsets: ['latin'],
 });
 
 const monoFont = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
-  weight: ["400", "500"],
-  subsets: ["latin"],
+  variable: '--font-plex-mono',
+  weight: ['400', '500'],
+  subsets: ['latin'],
 });
 
 export const metadata: Metadata = {
-  title: "Smart Study Assistant",
+  title: 'Smart Study Assistant',
   description:
-    "AI-powered study workspace for smarter notes, acronyms, quizzes, and spaced repetition.",
+    'AI-powered study workspace for smarter notes, acronyms, quizzes, and spaced repetition.',
 };
 
 export default function RootLayout({
