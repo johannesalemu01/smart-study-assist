@@ -126,6 +126,10 @@ export default function Home() {
   const [manualCardFront, setManualCardFront] = useState('');
   const [manualCardBack, setManualCardBack] = useState('');
   const [selectedNoteId, setSelectedNoteId] = useState('');
+  const [quickReviewCard, setQuickReviewCard] = useState<Flashcard | null>(
+    null,
+  );
+  const [showQuickReviewAnswer, setShowQuickReviewAnswer] = useState(false);
 
   const [activeQuizId, setActiveQuizId] = useState('');
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
@@ -144,7 +148,7 @@ export default function Home() {
     { id: 'command', label: 'Command Center', hint: 'Overview + goals' },
     { id: 'notes', label: 'Notes Studio', hint: 'Create + search notes' },
     { id: 'mnemonics', label: 'Mnemonic Forge', hint: 'Acronym engine' },
-    { id: 'flashcards', label: 'Recall Grid', hint: 'Spaced repetition' },
+    { id: 'flashcards', label: 'Flashcards', hint: 'Spaced repetition' },
     { id: 'quizzes', label: 'Quiz Arena', hint: 'Practice and score' },
     { id: 'focus', label: 'Focus Timer', hint: 'Pomodoro loop' },
   ];
@@ -427,8 +431,7 @@ export default function Home() {
     }
   }
 
-  async function onCreateManualCard(e: FormEvent) {
-    e.preventDefault();
+  async function createManualCard() {
     if (!manualCardFront.trim() || !manualCardBack.trim()) {
       setStatus('Both front and back are required.');
       return;
@@ -458,6 +461,29 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function onCreateManualCard(e: FormEvent) {
+    e.preventDefault();
+    await createManualCard();
+  }
+
+  function pickQuickReviewCard() {
+    const now = Date.now();
+    const dueCards = flashcards.filter(
+      (card) => new Date(card.nextReview).getTime() <= now,
+    );
+    const source = dueCards.length ? dueCards : flashcards;
+
+    if (!source.length) {
+      setStatus('No flashcards available yet. Create one first.');
+      return;
+    }
+
+    const randomIndex = Math.floor(Math.random() * source.length);
+    setQuickReviewCard(source[randomIndex]);
+    setShowQuickReviewAnswer(false);
+    setStatus(dueCards.length ? 'Loaded a due card.' : 'Loaded a random card.');
   }
 
   async function generateCardsFromNote(noteId: string) {
@@ -653,6 +679,137 @@ export default function Home() {
                 <span className="muted small">No topics recorded.</span>
               )}
             </div>
+          </div>
+
+          <div className="panel panel-heavy form-stack">
+            <div className="item-head">
+              <h3>Quick Flashcard Creator</h3>
+              <button
+                className="button button-ghost"
+                onClick={() => setActiveView('flashcards')}
+              >
+                Open Flashcards Tab
+              </button>
+            </div>
+            <select
+              className="select"
+              value={selectedNoteId}
+              onChange={(e) => setSelectedNoteId(e.target.value)}
+            >
+              <option value="">Optional note link</option>
+              {notes.map((note) => (
+                <option key={note.id} value={note.id}>
+                  {note.title}
+                </option>
+              ))}
+            </select>
+            <input
+              className="input"
+              placeholder="Front"
+              value={manualCardFront}
+              onChange={(e) => setManualCardFront(e.target.value)}
+            />
+            <textarea
+              className="textarea"
+              placeholder="Back"
+              value={manualCardBack}
+              onChange={(e) => setManualCardBack(e.target.value)}
+            />
+            <button
+              className="button button-primary"
+              onClick={() => void createManualCard()}
+            >
+              Create Flashcard Now
+            </button>
+          </div>
+        </div>
+
+        <div className="grid-duo">
+          <div className="panel form-stack">
+            <h3>Note Boost Actions</h3>
+            <p className="muted small">
+              Pick a note and instantly generate quiz and flashcard packs.
+            </p>
+            <select
+              className="select"
+              value={selectedNoteId}
+              onChange={(e) => setSelectedNoteId(e.target.value)}
+            >
+              <option value="">Choose note</option>
+              {notes.map((note) => (
+                <option key={note.id} value={note.id}>
+                  {note.title}
+                </option>
+              ))}
+            </select>
+            <div className="inline-actions">
+              <button
+                className="button button-ghost"
+                onClick={() => {
+                  if (!selectedNoteId) {
+                    setStatus('Select a note first.');
+                    return;
+                  }
+                  void generateCardsFromNote(selectedNoteId);
+                }}
+              >
+                Generate Flashcards
+              </button>
+              <button
+                className="button button-ghost"
+                onClick={() => {
+                  if (!selectedNoteId) {
+                    setStatus('Select a note first.');
+                    return;
+                  }
+                  void createQuizFromNote(selectedNoteId);
+                }}
+              >
+                Generate Quiz
+              </button>
+            </div>
+          </div>
+
+          <div className="panel form-stack">
+            <h3>Instant Review Card</h3>
+            <p className="muted small">
+              Pull a due card instantly and review from Command Center.
+            </p>
+            <button className="button button-ghost" onClick={pickQuickReviewCard}>
+              Pick Random Card
+            </button>
+            {!!quickReviewCard && (
+              <div className="panel sub-panel form-stack">
+                <p className="label">{quickReviewCard.front}</p>
+                <button
+                  className="button button-ghost"
+                  onClick={() => setShowQuickReviewAnswer((curr) => !curr)}
+                >
+                  {showQuickReviewAnswer ? 'Hide Answer' : 'Reveal Answer'}
+                </button>
+                {showQuickReviewAnswer && <p>{quickReviewCard.back}</p>}
+                <div className="inline-actions">
+                  <button
+                    className="button button-ghost"
+                    onClick={() => void reviewCard(quickReviewCard.id, 2)}
+                  >
+                    Hard
+                  </button>
+                  <button
+                    className="button button-ghost"
+                    onClick={() => void reviewCard(quickReviewCard.id, 4)}
+                  >
+                    Good
+                  </button>
+                  <button
+                    className="button button-ghost"
+                    onClick={() => void reviewCard(quickReviewCard.id, 5)}
+                  >
+                    Easy
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </section>
