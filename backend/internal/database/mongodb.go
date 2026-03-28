@@ -22,7 +22,14 @@ func ConnectDB() *mongo.Client {
 		mongoURI = "mongodb://localhost:27017"
 	}
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	clientOptions := options.Client().ApplyURI(mongoURI).
+		SetMaxPoolSize(50).
+		SetMinPoolSize(5).
+		SetMaxConnIdleTime(5 * time.Minute).
+		SetServerSelectionTimeout(5 * time.Second).
+		SetConnectTimeout(10 * time.Second)
+
+	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
 		log.Fatalf("Error connecting to MongoDB: %v", err)
 	}

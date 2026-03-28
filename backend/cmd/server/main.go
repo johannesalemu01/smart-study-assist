@@ -1,37 +1,48 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"os"
 
+	"smart-study-assist-api/internal/auth"
+	"smart-study-assist-api/internal/database"
+	"smart-study-assist-api/internal/handlers"
+	"smart-study-assist-api/internal/study"
+
 	"github.com/gin-gonic/gin"
 	"github.com/graphql-go/graphql"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Warning: .env file not found")
+	}
+
+	// Initialize MongoDB
+	client := database.ConnectDB()
+	_ = client
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	schema, err := graphql.NewSchema(graphql.SchemaConfig{
-		Query: graphql.NewObject(graphql.ObjectConfig{
-			Name: "Query",
-			Fields: graphql.Fields{
-				"health": &graphql.Field{
-					Type: graphql.NewNonNull(graphql.String),
-					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-						return "ok", nil
-					},
-				},
-			},
-		}),
-	})
+	studyService := study.NewService(client)
+	schema, err := study.BuildSchema(studyService)
 	if err != nil {
 		panic(err)
 	}
 
 	r := gin.Default()
+
+	authHandler := handlers.NewAuthHandler(client)
+	r.POST("/register", authHandler.Register)
+	r.POST("/login", authHandler.Login)
+
+	protected := r.Group("/api")
+	protected.Use(auth.AuthMiddleware())
+
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
