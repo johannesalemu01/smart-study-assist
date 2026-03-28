@@ -58,7 +58,7 @@ func NewService(client *mongo.Client) *Service {
 		notesCol:      database.GetCollection(client, "notes"),
 		flashcardsCol: database.GetCollection(client, "flashcards"),
 		quizzesCol:    database.GetCollection(client, "quizzes"),
-		sessionsCol:   database.GetCollection(client, "study_sessions"),
+		sessionsCol:   database.GetCollection(client, "study_sessions" ),
 	}
 }
 
