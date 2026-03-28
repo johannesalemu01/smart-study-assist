@@ -1,14 +1,14 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 type View =
-  | 'dashboard'
+  | 'command'
   | 'notes'
-  | 'acronyms'
+  | 'mnemonics'
   | 'flashcards'
   | 'quizzes'
-  | 'study';
+  | 'focus';
 
 type Note = {
   id: string;
@@ -68,6 +68,8 @@ type Dashboard = {
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/graphql';
 const DEFAULT_USER_ID = '64b64f7c5e9b1f0d0a1b2c3d';
+const DAILY_GOAL_STORAGE_KEY = 'ssa-daily-goal-minutes';
+const TODAY_FOCUS_STORAGE_KEY = 'ssa-today-focus-seconds';
 
 async function gql<T>(
   query: string,
@@ -91,17 +93,28 @@ async function gql<T>(
   return payload.data as T;
 }
 
+function formatClock(secondsTotal: number): string {
+  const minutes = Math.floor(secondsTotal / 60);
+  const seconds = secondsTotal % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 export default function Home() {
-  const [activeView, setActiveView] = useState<View>('dashboard');
+  const userId = DEFAULT_USER_ID;
+
+  const [activeView, setActiveView] = useState<View>('command');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('Ready');
-
-  const [userId, setUserId] = useState(DEFAULT_USER_ID);
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [dailyGoalMinutes, setDailyGoalMinutes] = useState(90);
+  const [todayFocusSeconds, setTodayFocusSeconds] = useState(0);
+  const [dueOnlyFlashcards, setDueOnlyFlashcards] = useState(false);
 
   const [noteTitle, setNoteTitle] = useState('');
   const [noteTags, setNoteTags] = useState('');
@@ -117,27 +130,92 @@ export default function Home() {
   const [activeQuizId, setActiveQuizId] = useState('');
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const [lastQuizScore, setLastQuizScore] = useState<number | null>(null);
+  const [randomQuestion, setRandomQuestion] = useState<QuizQuestion | null>(
+    null,
+  );
+  const [showRandomAnswer, setShowRandomAnswer] = useState(false);
 
   const [pomodoroOn, setPomodoroOn] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
-  const [studyTopic, setStudyTopic] = useState('General Study');
+  const [studyTopic, setStudyTopic] = useState('Deep Work');
+
+  const navItems: { id: View; label: string; hint: string }[] = [
+    { id: 'command', label: 'Command Center', hint: 'Overview + goals' },
+    { id: 'notes', label: 'Notes Studio', hint: 'Create + search notes' },
+    { id: 'mnemonics', label: 'Mnemonic Forge', hint: 'Acronym engine' },
+    { id: 'flashcards', label: 'Recall Grid', hint: 'Spaced repetition' },
+    { id: 'quizzes', label: 'Quiz Arena', hint: 'Practice and score' },
+    { id: 'focus', label: 'Focus Timer', hint: 'Pomodoro loop' },
+  ];
 
   const activeQuiz = useMemo(
     () => quizzes.find((quiz) => quiz.id === activeQuizId),
     [quizzes, activeQuizId],
   );
 
-  const navItems: { id: View; label: string }[] = [
-    { id: 'dashboard', label: 'Progress' },
-    { id: 'notes', label: 'Notes' },
-    { id: 'acronyms', label: 'Acronyms' },
-    { id: 'flashcards', label: 'Flashcards' },
-    { id: 'quizzes', label: 'Quizzes' },
-    { id: 'study', label: 'Study Mode' },
-  ];
+  const searchNeedle = globalSearch.trim().toLowerCase();
 
-  async function loadAll() {
+  const filteredNotes = useMemo(() => {
+    if (!searchNeedle) {
+      return notes;
+    }
+
+    return notes.filter((note) => {
+      const haystack = [
+        note.title,
+        note.content,
+        note.summary,
+        ...(note.keyTerms ?? []),
+        ...(note.tags ?? []),
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      return haystack.includes(searchNeedle);
+    });
+  }, [notes, searchNeedle]);
+
+  const filteredFlashcards = useMemo(() => {
+    if (!searchNeedle) {
+      return flashcards;
+    }
+
+    return flashcards.filter((card) => {
+      const haystack = `${card.front} ${card.back}`.toLowerCase();
+      return haystack.includes(searchNeedle);
+    });
+  }, [flashcards, searchNeedle]);
+
+  const filteredQuizzes = useMemo(() => {
+    if (!searchNeedle) {
+      return quizzes;
+    }
+
+    return quizzes.filter((quiz) => {
+      const haystack = [
+        quiz.title,
+        ...quiz.questions.map(
+          (question) => `${question.text} ${question.topic ?? ''}`,
+        ),
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      return haystack.includes(searchNeedle);
+    });
+  }, [quizzes, searchNeedle]);
+
+  const goalProgress = Math.min(
+    100,
+    Math.round((todayFocusSeconds / Math.max(dailyGoalMinutes * 60, 1)) * 100),
+  );
+
+  const dueSoonCount = flashcards.filter((card) => {
+    return new Date(card.nextReview).getTime() <= Date.now();
+  }).length;
+
+  const loadAll = useCallback(async () => {
     setLoading(true);
     try {
       const [noteData, flashcardData, quizData, dashboardData] =
@@ -147,8 +225,8 @@ export default function Home() {
             { userId },
           ),
           gql<{ flashcards: Flashcard[] }>(
-            `query($userId: String!) { flashcards(userId: $userId, dueOnly: false) { id noteId front back nextReview interval easeFactor repetition } }`,
-            { userId },
+            `query($userId: String!, $dueOnly: Boolean) { flashcards(userId: $userId, dueOnly: $dueOnly) { id noteId front back nextReview interval easeFactor repetition } }`,
+            { userId, dueOnly: dueOnlyFlashcards },
           ),
           gql<{ quizzes: Quiz[] }>(
             `query($userId: String!) { quizzes(userId: $userId) { id title createdAt questions { id text type options correctAnswer topic } } }`,
@@ -170,12 +248,77 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [dueOnlyFlashcards, userId]);
+
+  const savePomodoroSession = useCallback(
+    async (
+      sessionType: 'focus' | 'break' = mode,
+      durationSeconds = (sessionType === 'focus' ? 25 : 5) * 60,
+    ) => {
+      setLoading(true);
+      try {
+        await gql(
+          `mutation($userId: String!, $duration: Int!, $type: String!, $topic: String) {
+          saveStudySession(userId: $userId, duration: $duration, type: $type, topic: $topic) { id }
+        }`,
+          {
+            userId,
+            duration: durationSeconds,
+            type: sessionType === 'focus' ? 'pomodoro' : 'break',
+            topic: studyTopic,
+          },
+        );
+        setStatus('Study session saved.');
+        await loadAll();
+      } catch (error) {
+        setStatus(
+          error instanceof Error
+            ? error.message
+            : 'Could not save study session',
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loadAll, mode, studyTopic, userId],
+  );
 
   useEffect(() => {
-    loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+    const savedGoal = window.localStorage.getItem(DAILY_GOAL_STORAGE_KEY);
+    const savedFocus = window.localStorage.getItem(TODAY_FOCUS_STORAGE_KEY);
+
+    if (savedGoal) {
+      const parsed = Number(savedGoal);
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        setDailyGoalMinutes(parsed);
+      }
+    }
+
+    if (savedFocus) {
+      const parsed = Number(savedFocus);
+      if (!Number.isNaN(parsed) && parsed >= 0) {
+        setTodayFocusSeconds(parsed);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      DAILY_GOAL_STORAGE_KEY,
+      String(dailyGoalMinutes),
+    );
+  }, [dailyGoalMinutes]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      TODAY_FOCUS_STORAGE_KEY,
+      String(todayFocusSeconds),
+    );
+  }, [todayFocusSeconds]);
+
+  useEffect(() => {
+    void loadAll();
+  }, [loadAll]);
 
   useEffect(() => {
     if (!pomodoroOn) {
@@ -195,11 +338,19 @@ export default function Home() {
     }
 
     setMode((prev) => {
-      const next = prev === 'focus' ? 'break' : 'focus';
-      setSecondsLeft(next === 'focus' ? 25 * 60 : 5 * 60);
-      return next;
+      const completedMode = prev;
+      const nextMode = prev === 'focus' ? 'break' : 'focus';
+      const completedSeconds = completedMode === 'focus' ? 25 * 60 : 5 * 60;
+
+      if (completedMode === 'focus') {
+        setTodayFocusSeconds((curr) => curr + completedSeconds);
+      }
+
+      void savePomodoroSession(completedMode, completedSeconds);
+      setSecondsLeft(nextMode === 'focus' ? 25 * 60 : 5 * 60);
+      return nextMode;
     });
-  }, [pomodoroOn, secondsLeft]);
+  }, [pomodoroOn, savePomodoroSession, secondsLeft]);
 
   async function onCreateNote(e: FormEvent) {
     e.preventDefault();
@@ -264,6 +415,15 @@ export default function Home() {
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function copyMnemonic(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setStatus('Mnemonic copied to clipboard.');
+    } catch {
+      setStatus('Clipboard not available in this browser.');
     }
   }
 
@@ -392,84 +552,105 @@ export default function Home() {
     }
   }
 
-  async function savePomodoroSession() {
-    const minutes = mode === 'focus' ? 25 : 5;
-    setLoading(true);
-    try {
-      await gql(
-        `mutation($userId: String!, $duration: Int!, $type: String!, $topic: String) {
-          saveStudySession(userId: $userId, duration: $duration, type: $type, topic: $topic) { id }
-        }`,
-        {
-          userId,
-          duration: minutes * 60,
-          type: mode === 'focus' ? 'pomodoro' : 'break',
-          topic: studyTopic,
-        },
-      );
-      setStatus('Study session saved.');
-      await loadAll();
-    } catch (error) {
-      setStatus(
-        error instanceof Error ? error.message : 'Could not save study session',
-      );
-    } finally {
-      setLoading(false);
+  function pickRandomQuestion() {
+    if (!activeQuiz?.questions.length) {
+      setStatus('Pick a quiz first to use random practice mode.');
+      return;
     }
+
+    const idx = Math.floor(Math.random() * activeQuiz.questions.length);
+    setRandomQuestion(activeQuiz.questions[idx]);
+    setShowRandomAnswer(false);
+    setStatus('Random question ready. Try answering before reveal.');
   }
 
-  function renderDashboard() {
+  function renderCommandCenter() {
     const totalHours = ((dashboard?.totalStudySeconds ?? 0) / 3600).toFixed(1);
 
     return (
-      <section className="panel p-5 space-y-4">
-        <h2 className="text-2xl font-bold">Progress Dashboard</h2>
-        <div className="grid md:grid-cols-3 gap-3">
-          <div className="panel p-3">
-            <p className="muted text-xs uppercase">Study Time</p>
-            <p className="text-2xl font-semibold">{totalHours}h</p>
-          </div>
-          <div className="panel p-3">
-            <p className="muted text-xs uppercase">Quiz Attempts</p>
-            <p className="text-2xl font-semibold">
-              {dashboard?.quizAttempts ?? 0}
+      <section className="view-stack">
+        <div className="panel panel-heavy hero-grid">
+          <div>
+            <p className="eyebrow">System status</p>
+            <h2 className="hero-title">Noir Study Console</h2>
+            <p className="muted">
+              Rebuilt for focus: one search, one command surface, zero visible
+              user IDs.
             </p>
           </div>
-          <div className="panel p-3">
-            <p className="muted text-xs uppercase">Average Quiz Score</p>
-            <p className="text-2xl font-semibold">
-              {dashboard?.averageQuizScore ?? 0}%
-            </p>
+          <div className="metrics-row">
+            <div className="metric-card">
+              <p className="metric-label">Total Study</p>
+              <p className="metric-value">{totalHours}h</p>
+            </div>
+            <div className="metric-card">
+              <p className="metric-label">Quiz Avg</p>
+              <p className="metric-value">
+                {dashboard?.averageQuizScore ?? 0}%
+              </p>
+            </div>
+            <div className="metric-card">
+              <p className="metric-label">Due Cards</p>
+              <p className="metric-value">{dueSoonCount}</p>
+            </div>
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-3">
-          <div className="panel p-3">
-            <p className="font-semibold mb-2">Topics Covered</p>
-            <div className="flex flex-wrap gap-2">
+        <div className="grid-duo">
+          <div className="panel">
+            <h3>Daily Goal Tracker</h3>
+            <p className="muted small">
+              Stored locally for quick momentum checks.
+            </p>
+            <div className="goal-input-row">
+              <label htmlFor="goal">Goal minutes</label>
+              <input
+                id="goal"
+                className="input"
+                type="number"
+                min={15}
+                step={5}
+                value={dailyGoalMinutes}
+                onChange={(e) =>
+                  setDailyGoalMinutes(
+                    Math.max(15, Number(e.target.value) || 15),
+                  )
+                }
+              />
+            </div>
+            <p className="muted small">
+              Today focus: {Math.round(todayFocusSeconds / 60)} min
+            </p>
+            <div className="progress-shell">
+              <div
+                className="progress-bar"
+                style={{ width: `${goalProgress}%` }}
+              />
+            </div>
+            <p className="small">{goalProgress}% complete</p>
+          </div>
+
+          <div className="panel">
+            <h3>Weak Areas</h3>
+            <div className="tag-wrap">
+              {(dashboard?.weakAreas ?? []).map((topic) => (
+                <span key={topic} className="chip chip-warn">
+                  {topic}
+                </span>
+              ))}
+              {!dashboard?.weakAreas?.length && (
+                <span className="muted small">No weak areas flagged yet.</span>
+              )}
+            </div>
+            <h3 className="space-top">Topics Covered</h3>
+            <div className="tag-wrap">
               {(dashboard?.topicsCovered ?? []).map((topic) => (
                 <span key={topic} className="chip">
                   {topic}
                 </span>
               ))}
               {!dashboard?.topicsCovered?.length && (
-                <p className="muted text-sm">No topics yet.</p>
-              )}
-            </div>
-          </div>
-          <div className="panel p-3">
-            <p className="font-semibold mb-2">Weak Areas</p>
-            <div className="space-y-2">
-              {(dashboard?.weakAreas ?? []).map((topic) => (
-                <div key={topic} className="flex items-center justify-between">
-                  <span>{topic}</span>
-                  <span className="text-xs px-2 py-1 rounded bg-red-100 text-red-700">
-                    Review
-                  </span>
-                </div>
-              ))}
-              {!dashboard?.weakAreas?.length && (
-                <p className="muted text-sm">No weak areas recorded.</p>
+                <span className="muted small">No topics recorded.</span>
               )}
             </div>
           </div>
@@ -480,9 +661,9 @@ export default function Home() {
 
   function renderNotes() {
     return (
-      <section className="space-y-4">
-        <form onSubmit={onCreateNote} className="panel p-5 space-y-3">
-          <h2 className="text-2xl font-bold">Smart Notes Generator</h2>
+      <section className="view-stack">
+        <form onSubmit={onCreateNote} className="panel panel-heavy form-stack">
+          <h2>Create Smart Note</h2>
           <input
             className="input"
             placeholder="Note title"
@@ -506,44 +687,39 @@ export default function Home() {
           </button>
         </form>
 
-        <div className="space-y-3">
-          {notes.map((note) => (
-            <article key={note.id} className="panel p-4 space-y-2">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-semibold">{note.title}</h3>
-                  <div className="flex gap-2 flex-wrap mt-1">
-                    {(note.tags ?? []).map((tag) => (
-                      <span key={tag} className="chip">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-2">
+        <div className="note-grid">
+          {filteredNotes.map((note) => (
+            <article key={note.id} className="panel">
+              <div className="item-head">
+                <h3>{note.title}</h3>
+                <div className="inline-actions">
                   <button
-                    className="button button-secondary"
+                    className="button button-ghost"
                     onClick={() => generateCardsFromNote(note.id)}
                   >
-                    Flashcards
+                    Make Cards
                   </button>
                   <button
-                    className="button button-secondary"
+                    className="button button-ghost"
                     onClick={() => createQuizFromNote(note.id)}
                   >
-                    Quiz
+                    Make Quiz
                   </button>
                 </div>
               </div>
+              <div className="tag-wrap">
+                {(note.tags ?? []).map((tag) => (
+                  <span key={tag} className="chip">
+                    {tag}
+                  </span>
+                ))}
+              </div>
               <p className="muted">{note.summary}</p>
               {!!note.keyTerms?.length && (
-                <p>
-                  <span className="font-semibold">Key terms:</span>{' '}
-                  {note.keyTerms.join(', ')}
-                </p>
+                <p className="small">Key terms: {note.keyTerms.join(', ')}</p>
               )}
               {!!note.bulletPoints?.length && (
-                <ul className="list-disc pl-5 space-y-1">
+                <ul className="simple-list">
                   {note.bulletPoints.map((point, idx) => (
                     <li key={`${note.id}-${idx}`}>{point}</li>
                   ))}
@@ -551,24 +727,25 @@ export default function Home() {
               )}
             </article>
           ))}
-          {!notes.length && (
-            <p className="muted">
-              Create your first note to unlock auto-generated study assets.
-            </p>
+          {!filteredNotes.length && (
+            <p className="muted">No notes match your search.</p>
           )}
         </div>
       </section>
     );
   }
 
-  function renderAcronyms() {
+  function renderMnemonics() {
     return (
-      <section className="space-y-4">
-        <form onSubmit={onGenerateAcronyms} className="panel p-5 space-y-3">
-          <h2 className="text-2xl font-bold">Acronym & Mnemonic Generator</h2>
+      <section className="view-stack">
+        <form
+          onSubmit={onGenerateAcronyms}
+          className="panel panel-heavy form-stack"
+        >
+          <h2>Mnemonic Forge</h2>
           <textarea
             className="textarea"
-            placeholder="Enter words, bullets, or concepts (one per line)"
+            placeholder="Enter words or concepts (line/comma separated)"
             value={acronymWords}
             onChange={(e) => setAcronymWords(e.target.value)}
           />
@@ -577,20 +754,24 @@ export default function Home() {
           </button>
         </form>
 
-        <div className="grid lg:grid-cols-2 gap-3">
+        <div className="grid-duo">
           {acronyms.map((item) => (
-            <article key={item.acronym} className="panel p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold tracking-wide">
-                  {item.acronym}
-                </h3>
-                <span className="chip">Score: {item.score}</span>
+            <article key={item.acronym} className="panel">
+              <div className="item-head">
+                <h3>{item.acronym}</h3>
+                <span className="chip">Score {item.score}</span>
               </div>
-              <p className="muted text-sm">
-                Readability {item.readabilityScore} · Familiarity{' '}
+              <p className="muted small">
+                Readability {item.readabilityScore} | Familiarity{' '}
                 {item.familiarityScore}
               </p>
               <p>{item.mnemonic}</p>
+              <button
+                className="button button-ghost"
+                onClick={() => copyMnemonic(item.mnemonic)}
+              >
+                Copy Mnemonic
+              </button>
             </article>
           ))}
           {!acronyms.length && (
@@ -603,9 +784,20 @@ export default function Home() {
 
   function renderFlashcards() {
     return (
-      <section className="space-y-4">
-        <form className="panel p-5 space-y-3" onSubmit={onCreateManualCard}>
-          <h2 className="text-2xl font-bold">Flashcards</h2>
+      <section className="view-stack">
+        <form
+          className="panel panel-heavy form-stack"
+          onSubmit={onCreateManualCard}
+        >
+          <h2>Manual Flashcard Builder</h2>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={dueOnlyFlashcards}
+              onChange={(e) => setDueOnlyFlashcards(e.target.checked)}
+            />
+            Load due-only cards from API
+          </label>
           <select
             className="select"
             value={selectedNoteId}
@@ -620,13 +812,13 @@ export default function Home() {
           </select>
           <input
             className="input"
-            placeholder="Front (question/acronym)"
+            placeholder="Front"
             value={manualCardFront}
             onChange={(e) => setManualCardFront(e.target.value)}
           />
           <textarea
             className="textarea"
-            placeholder="Back (answer/explanation)"
+            placeholder="Back"
             value={manualCardBack}
             onChange={(e) => setManualCardBack(e.target.value)}
           />
@@ -635,29 +827,29 @@ export default function Home() {
           </button>
         </form>
 
-        <div className="grid md:grid-cols-2 gap-3">
-          {flashcards.map((card) => (
-            <article key={card.id} className="panel p-4 space-y-2">
-              <p className="text-sm muted">
-                Next review: {new Date(card.nextReview).toLocaleString()}
+        <div className="note-grid">
+          {filteredFlashcards.map((card) => (
+            <article key={card.id} className="panel">
+              <p className="muted small">
+                Next: {new Date(card.nextReview).toLocaleString()}
               </p>
-              <p className="font-semibold">{card.front}</p>
+              <p className="label">{card.front}</p>
               <p>{card.back}</p>
-              <div className="flex gap-2">
+              <div className="inline-actions">
                 <button
-                  className="button button-secondary"
+                  className="button button-ghost"
                   onClick={() => reviewCard(card.id, 2)}
                 >
                   Hard
                 </button>
                 <button
-                  className="button button-secondary"
+                  className="button button-ghost"
                   onClick={() => reviewCard(card.id, 4)}
                 >
                   Good
                 </button>
                 <button
-                  className="button button-secondary"
+                  className="button button-ghost"
                   onClick={() => reviewCard(card.id, 5)}
                 >
                   Easy
@@ -665,7 +857,9 @@ export default function Home() {
               </div>
             </article>
           ))}
-          {!flashcards.length && <p className="muted">No flashcards yet.</p>}
+          {!filteredFlashcards.length && (
+            <p className="muted">No flashcards match your search.</p>
+          )}
         </div>
       </section>
     );
@@ -673,13 +867,9 @@ export default function Home() {
 
   function renderQuizzes() {
     return (
-      <section className="space-y-4">
-        <div className="panel p-5 space-y-3">
-          <h2 className="text-2xl font-bold">Quiz Generator</h2>
-          <p className="muted text-sm">
-            Generate a quiz from any note in the Notes section, then select it
-            below to answer.
-          </p>
+      <section className="view-stack">
+        <div className="panel panel-heavy form-stack">
+          <h2>Quiz Arena</h2>
           <select
             className="select"
             value={activeQuizId}
@@ -687,21 +877,51 @@ export default function Home() {
               setActiveQuizId(e.target.value);
               setQuizAnswers({});
               setLastQuizScore(null);
+              setRandomQuestion(null);
             }}
           >
             <option value="">Select a quiz</option>
-            {quizzes.map((quiz) => (
+            {filteredQuizzes.map((quiz) => (
               <option key={quiz.id} value={quiz.id}>
                 {quiz.title}
               </option>
             ))}
           </select>
 
+          <div className="inline-actions">
+            <button
+              className="button button-ghost"
+              onClick={pickRandomQuestion}
+            >
+              Random Question
+            </button>
+          </div>
+
+          {!!randomQuestion && (
+            <div className="panel sub-panel">
+              <p className="label">{randomQuestion.text}</p>
+              {!!randomQuestion.options?.length && (
+                <p className="muted small">
+                  Options: {randomQuestion.options.join(' | ')}
+                </p>
+              )}
+              <button
+                className="button button-ghost"
+                onClick={() => setShowRandomAnswer((v) => !v)}
+              >
+                {showRandomAnswer ? 'Hide Answer' : 'Reveal Answer'}
+              </button>
+              {showRandomAnswer && (
+                <p className="small">Answer: {randomQuestion.correctAnswer}</p>
+              )}
+            </div>
+          )}
+
           {!!activeQuiz && (
-            <div className="space-y-4">
+            <div className="form-stack">
               {activeQuiz.questions.map((question, index) => (
-                <div key={question.id} className="panel p-3 space-y-2">
-                  <p className="font-medium">
+                <div key={question.id} className="panel sub-panel">
+                  <p className="label">
                     {index + 1}. {question.text}
                   </p>
                   {!!question.options?.length ? (
@@ -741,9 +961,7 @@ export default function Home() {
                 Submit Quiz
               </button>
               {lastQuizScore !== null && (
-                <p className="text-lg font-semibold">
-                  Latest Score: {lastQuizScore}%
-                </p>
+                <p className="label">Latest Score: {lastQuizScore}%</p>
               )}
             </div>
           )}
@@ -752,112 +970,114 @@ export default function Home() {
     );
   }
 
-  function renderStudyMode() {
-    const minutes = Math.floor(secondsLeft / 60);
-    const seconds = secondsLeft % 60;
-
+  function renderFocusMode() {
     return (
-      <section className="panel p-5 space-y-4">
-        <h2 className="text-2xl font-bold">Study Mode</h2>
-        <p className="muted">
-          Pomodoro timer: 25 minutes focus, 5 minutes break.
-        </p>
-
-        <div className="panel p-4 text-center space-y-2">
-          <p className="text-xs uppercase muted">
-            {mode === 'focus' ? 'Focus Session' : 'Break Session'}
+      <section className="view-stack">
+        <div className="panel panel-heavy form-stack">
+          <h2>Focus Timer</h2>
+          <p className="muted small">
+            25 min focus / 5 min break. Auto-saves each completed cycle.
           </p>
-          <p className="text-6xl font-bold tabular-nums">
-            {String(minutes).padStart(2, '0')}:
-            {String(seconds).padStart(2, '0')}
-          </p>
-        </div>
 
-        <input
-          className="input"
-          value={studyTopic}
-          onChange={(e) => setStudyTopic(e.target.value)}
-          placeholder="Study topic"
-        />
+          <div className="timer-face">{formatClock(secondsLeft)}</div>
 
-        <div className="grid md:grid-cols-3 gap-3">
+          <input
+            className="input"
+            value={studyTopic}
+            onChange={(e) => setStudyTopic(e.target.value)}
+            placeholder="Topic for this session"
+          />
+
+          <div className="inline-actions">
+            <button
+              className="button button-primary"
+              onClick={() => setPomodoroOn(true)}
+            >
+              Start
+            </button>
+            <button
+              className="button button-ghost"
+              onClick={() => setPomodoroOn(false)}
+            >
+              Pause
+            </button>
+            <button
+              className="button button-ghost"
+              onClick={() => {
+                setPomodoroOn(false);
+                setSecondsLeft(25 * 60);
+                setMode('focus');
+              }}
+            >
+              Reset
+            </button>
+          </div>
+
           <button
             className="button button-primary"
-            onClick={() => setPomodoroOn(true)}
-          >
-            Start
-          </button>
-          <button
-            className="button button-secondary"
-            onClick={() => setPomodoroOn(false)}
-          >
-            Pause
-          </button>
-          <button
-            className="button button-secondary"
             onClick={() => {
-              setPomodoroOn(false);
-              setSecondsLeft(25 * 60);
-              setMode('focus');
+              const saveDuration = mode === 'focus' ? 25 * 60 : 5 * 60;
+              if (mode === 'focus') {
+                setTodayFocusSeconds((curr) => curr + saveDuration);
+              }
+              void savePomodoroSession(mode, saveDuration);
             }}
           >
-            Reset
+            Save Current Session
           </button>
         </div>
-
-        <button className="button button-primary" onClick={savePomodoroSession}>
-          Save Session
-        </button>
       </section>
     );
   }
 
   return (
-    <div className="study-shell">
-      <aside className="study-sidebar">
-        <div className="space-y-3">
-          <p className="text-xs uppercase muted tracking-[0.2em]">
-            Smart Study Assistant
-          </p>
-          <h1 className="text-2xl font-bold">Focus Console</h1>
-          <p className="text-sm muted">
-            Minimal and distraction-light workspace for active recall.
+    <div className="ssa-shell">
+      <aside className="ssa-sidebar">
+        <div className="brand-block">
+          <p className="eyebrow">Smart Study Assistant</p>
+          <h1>BLACK MODE</h1>
+          <p className="muted small">
+            Reimagined interface with deeper focus and faster review loops.
           </p>
         </div>
 
-        <div className="mt-4 space-y-2">
-          <label className="text-xs uppercase muted">User Id</label>
+        <div className="panel sub-panel">
+          <label htmlFor="global-search" className="small muted">
+            Global search
+          </label>
           <input
+            id="global-search"
             className="input"
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
+            placeholder="Search notes, cards, quizzes"
           />
+          <p className="small muted">
+            Status: {loading ? 'Working...' : status}
+          </p>
         </div>
 
-        <nav className="mt-6 space-y-2">
+        <nav className="nav-list">
           {navItems.map((item) => (
             <button
               key={item.id}
-              className={`button text-left ${activeView === item.id ? 'button-primary' : 'button-secondary'}`}
+              className={`nav-item ${activeView === item.id ? 'active' : ''}`}
               onClick={() => setActiveView(item.id)}
             >
-              {item.label}
+              <span>{item.label}</span>
+              <small>{item.hint}</small>
             </button>
           ))}
         </nav>
-
-        <div className="mt-6 text-sm muted">
-          <p>Status: {loading ? 'Working...' : status}</p>
-        </div>
       </aside>
 
-      <main className="study-main">
-        {activeView === 'dashboard' && renderDashboard()}
+      <main className="ssa-main">
+        {activeView === 'command' && renderCommandCenter()}
         {activeView === 'notes' && renderNotes()}
-        {activeView === 'acronyms' && renderAcronyms()}
+        {activeView === 'mnemonics' && renderMnemonics()}
         {activeView === 'flashcards' && renderFlashcards()}
         {activeView === 'quizzes' && renderQuizzes()}
-        {activeView === 'study' && renderStudyMode()}
+        {activeView === 'focus' && renderFocusMode()}
       </main>
     </div>
   );
