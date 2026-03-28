@@ -611,8 +611,11 @@ func (s *Service) quizStats(ctx context.Context, uid primitive.ObjectID) (int, f
 		pairs = append(pairs, topicCount{Topic: k, Count: v})
 	}
 	sort.Slice(pairs, func(i, j int) bool { return pairs[i].Count > pairs[j].Count })
+	if len(pairs) > 5 {
+		pairs = pairs[:5]
+	}
 	weak := make([]string, 0, 5)
-	for _, p := range takeTopicCounts(pairs, 5) {
+	for _, p := range pairs {
 		weak = append(weak, p.Topic)
 	}
 	return count, avg, weak, nil
@@ -725,7 +728,7 @@ func pronounceability(acr string) float64 {
 	ratio := float64(vowelCount) / float64(len(acr))
 	balance := 1 - math.Abs(0.4-ratio)
 	alternation := 1 / float64(runs)
-	score := (balance * 0.8) + ((1-alternation) * 0.2)
+	score := (balance * 0.8) + ((1 - alternation) * 0.2)
 	if score < 0 {
 		return 0
 	}
@@ -837,19 +840,6 @@ func take[T any](list []T, n int) []T {
 	if n < 0 {
 		n = 0
 	}
-	if len(list) <= n {
-		return list
-	}
-	return list[:n]
-}
-
-func takeTopicCounts(list []struct {
-	Topic string
-	Count int
-}, n int) []struct {
-	Topic string
-	Count int
-} {
 	if len(list) <= n {
 		return list
 	}

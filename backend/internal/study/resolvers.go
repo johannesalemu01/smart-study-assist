@@ -9,6 +9,90 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+func structStringField(source interface{}, field string) string {
+	v := reflect.ValueOf(source)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return ""
+	}
+	f := v.FieldByName(field)
+	if !f.IsValid() {
+		return ""
+	}
+	if s, ok := f.Interface().(string); ok {
+		return s
+	}
+	return ""
+}
+
+func stringField(field string) graphql.FieldResolveFn {
+	return func(p graphql.ResolveParams) (interface{}, error) {
+		return structStringField(p.Source, field), nil
+	}
+}
+
+func stringSliceField(field string) graphql.FieldResolveFn {
+	return func(p graphql.ResolveParams) (interface{}, error) {
+		v := reflect.ValueOf(p.Source)
+		if v.Kind() == reflect.Ptr {
+			v = v.Elem()
+		}
+		if v.Kind() != reflect.Struct {
+			return []string{}, nil
+		}
+		f := v.FieldByName(field)
+		if !f.IsValid() {
+			return []string{}, nil
+		}
+		if s, ok := f.Interface().([]string); ok {
+			return s, nil
+		}
+		return []string{}, nil
+	}
+}
+
+func intField(field string) graphql.FieldResolveFn {
+	return func(p graphql.ResolveParams) (interface{}, error) {
+		v := reflect.ValueOf(p.Source)
+		if v.Kind() == reflect.Ptr {
+			v = v.Elem()
+		}
+		if v.Kind() != reflect.Struct {
+			return 0, nil
+		}
+		f := v.FieldByName(field)
+		if !f.IsValid() {
+			return 0, nil
+		}
+		if i, ok := f.Interface().(int); ok {
+			return i, nil
+		}
+		return 0, nil
+	}
+}
+
+func floatField(field string) graphql.FieldResolveFn {
+	return func(p graphql.ResolveParams) (interface{}, error) {
+		v := reflect.ValueOf(p.Source)
+		if v.Kind() == reflect.Ptr {
+			v = v.Elem()
+		}
+		if v.Kind() != reflect.Struct {
+			return 0.0, nil
+		}
+		f := v.FieldByName(field)
+		if !f.IsValid() {
+			return 0.0, nil
+		}
+		if fv, ok := f.Interface().(float64); ok {
+			return fv, nil
+		}
+		return 0.0, nil
+	}
+}
+
 func oidResolver(field string) graphql.FieldResolveFn {
 	return func(p graphql.ResolveParams) (interface{}, error) {
 		source := reflect.ValueOf(p.Source)

@@ -1,26 +1,115 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f6f4ef;
+  --panel: #ffffff;
+  --text: #1f2a2c;
+  --muted: #5e6a6f;
+  --brand: #0f766e;
+  --brand-soft: #d1fae5;
+  --line: #d8ddd4;
+  --danger: #b91c1c;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --font-sans: var(--font-space-grotesk);
+  --font-mono: var(--font-plex-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(circle at 10% 0%, #eaf6f0 0%, transparent 42%),
+    radial-gradient(circle at 85% 20%, #fcefe2 0%, transparent 36%),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--font-space-grotesk), sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.study-shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+}
+
+.study-sidebar {
+  border-right: 1px solid var(--line);
+  background: #fcfcf8;
+  padding: 1.25rem;
+}
+
+.study-main {
+  padding: 1.25rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  padding: 0.18rem 0.56rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.input,
+.textarea,
+.select,
+.button {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.62rem 0.72rem;
+  color: var(--text);
+}
+
+.textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.button {
+  font-weight: 600;
+  transition: transform 180ms ease, background-color 180ms ease;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+}
+
+.button-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.button-secondary {
+  background: #fff;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .study-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .study-sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
 }
